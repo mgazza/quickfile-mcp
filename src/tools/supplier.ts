@@ -11,10 +11,7 @@ import {
   successResult,
   errorResult,
   cleanParams,
-  buildAddressFromArgs,
-  buildEntityData,
   searchSchemaProperties,
-  entitySchemaProperties,
   type ToolResult,
 } from "./utils.js";
 
@@ -57,7 +54,21 @@ export const supplierTools: Tool[] = [
     description: "Create a new supplier record",
     inputSchema: {
       type: "object",
-      properties: entitySchemaProperties,
+      properties: {
+        companyName: { type: "string" as const, description: "Company or organisation name" },
+        firstName: { type: "string" as const, description: "Contact first name" },
+        lastName: { type: "string" as const, description: "Contact last name" },
+        email: { type: "string" as const, description: "Email address" },
+        telephone: { type: "string" as const, description: "Telephone number" },
+        website: { type: "string" as const, description: "Website URL" },
+        address1: { type: "string" as const, description: "Address line 1" },
+        address2: { type: "string" as const, description: "Address line 2" },
+        town: { type: "string" as const, description: "Town/City" },
+        postcode: { type: "string" as const, description: "Postcode" },
+        country: { type: "string" as const, description: "Country ISO code (e.g., GB, US)" },
+        vatNumber: { type: "string" as const, description: "VAT registration number" },
+        companyRegNo: { type: "string" as const, description: "Company registration number" },
+      },
       required: [],
     },
   },
@@ -144,13 +155,25 @@ export async function handleSupplierTool(
       }
 
       case "quickfile_supplier_create": {
-        const address = buildAddressFromArgs(args);
-        const supplierData = buildEntityData(args, address);
-        const cleanData = cleanParams(supplierData);
+        const details: Record<string, unknown> = {};
+        if (args.companyName) details.CompanyName = args.companyName;
+        if (args.telephone) details.ContactTel = args.telephone;
+        if (args.address1) details.AddressLine1 = args.address1;
+        if (args.address2) details.AddressLine2 = args.address2;
+        if (args.town) details.Town = args.town;
+        if (args.postcode) details.Postcode = args.postcode;
+        if (args.country) details.CountryISO = args.country;
+        if (args.firstName) details.ContactFirstName = args.firstName;
+        if (args.lastName) details.ContactSurname = args.lastName;
+        if (args.email) details.ContactEmail = args.email;
+        if (args.website) details.Website = args.website;
+        if (args.companyRegNo) details.CompanyNumber = args.companyRegNo;
+        if (args.vatNumber) details.VatNumber = args.vatNumber;
+
         const response = await apiClient.request<
-          { SupplierData: typeof cleanData },
+          { SupplierDetails: typeof details },
           SupplierCreateResponse
-        >("Supplier_Create", { SupplierData: cleanData });
+        >("Supplier_Create", { SupplierDetails: details });
         return successResult({
           success: true,
           supplierId: response.SupplierID,
