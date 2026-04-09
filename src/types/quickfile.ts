@@ -211,12 +211,19 @@ export interface Purchase {
 export type PurchaseStatus = 'UNPAID' | 'PAID' | 'PART_PAID' | 'CANCELLED';
 
 export interface PurchaseLine {
+  ItemNominalCode: string;
   ItemDescription: string;
-  UnitCost: number;
-  Qty: number;
-  NominalCode: string;
-  Tax1?: InvoiceLineTax;
-  LineTotal?: number;
+  SubTotal: number;
+  VatRate: number;
+  VatTotal: number;
+}
+
+export interface PurchasePaymentData {
+  PaidDate: string;
+  BankNominalCode: number;
+  PayMethod: 'BACS' | 'DD' | 'STO' | 'CHEQUE' | 'CASH' | 'DCARD' | 'CCARD';
+  AmountPaid: number;
+  Notes?: string;
 }
 
 export interface PurchaseSearchParams {
@@ -233,12 +240,13 @@ export interface PurchaseSearchParams {
 
 export interface PurchaseCreateParams {
   SupplierID: number;
+  ReceiptDate: string;
+  TermDays?: number;
   Currency?: string;
-  IssueDate?: string;
-  DueDate?: string;
-  PurchaseLines: PurchaseLine[];
-  Notes?: string;
-  SupplierRef?: string;
+  InvoiceDescription: string;
+  SupplierReference?: string;
+  InvoiceLines: { ItemLine: PurchaseLine[] };
+  PaymentData?: PurchasePaymentData;
 }
 
 // =============================================================================
