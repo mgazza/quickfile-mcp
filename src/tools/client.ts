@@ -10,18 +10,23 @@ import {
   handleToolError,
   successResult,
   errorResult,
-  cleanParams,
-  buildAddressFromArgs,
-  buildEntityData,
-  buildEntityUpdateData,
   searchSchemaProperties,
-  entitySchemaProperties,
   type ToolResult,
 } from "./utils.js";
 
 // =============================================================================
 // Tool Definitions
 // =============================================================================
+
+const clientCreateProperties = {
+  companyName: { type: "string" as const, description: "Company or organisation name" },
+  address1: { type: "string" as const, description: "Address line 1" },
+  address2: { type: "string" as const, description: "Address line 2" },
+  town: { type: "string" as const, description: "Town/City" },
+  postcode: { type: "string" as const, description: "Postcode" },
+  country: { type: "string" as const, description: "Country ISO code (e.g., GB, US)" },
+  vatNumber: { type: "string" as const, description: "VAT registration number" },
+};
 
 export const clientTools: Tool[] = [
   {
@@ -58,7 +63,7 @@ export const clientTools: Tool[] = [
     description: "Create a new client record",
     inputSchema: {
       type: "object",
-      properties: entitySchemaProperties,
+      properties: clientCreateProperties,
       required: [],
     },
   },
@@ -69,7 +74,7 @@ export const clientTools: Tool[] = [
       type: "object",
       properties: {
         clientId: { type: "number", description: "The client ID to update" },
-        ...entitySchemaProperties,
+        ...clientCreateProperties,
       },
       required: ["clientId"],
     },
@@ -226,13 +231,19 @@ export async function handleClientTool(
       }
 
       case "quickfile_client_create": {
-        const address = buildAddressFromArgs(args);
-        const clientData = buildEntityData(args, address);
-        const cleanData = cleanParams(clientData);
+        const details: Record<string, unknown> = {};
+        if (args.companyName) details.CompanyName = args.companyName;
+        if (args.address1) details.AddressLine1 = args.address1;
+        if (args.address2) details.AddressLine2 = args.address2;
+        if (args.town) details.Town = args.town;
+        if (args.postcode) details.Postcode = args.postcode;
+        if (args.country) details.CountryISO = args.country;
+        if (args.vatNumber) details.VatNumber = args.vatNumber;
+
         const response = await apiClient.request<
-          { ClientData: typeof cleanData },
+          { ClientDetails: typeof details },
           ClientCreateResponse
-        >("Client_Create", { ClientData: cleanData });
+        >("Client_Create", { ClientDetails: details });
         return successResult({
           success: true,
           clientId: response.ClientID,
@@ -242,14 +253,19 @@ export async function handleClientTool(
 
       case "quickfile_client_update": {
         const clientId = args.clientId as number;
-        const address = buildAddressFromArgs(args);
-        const entityData = buildEntityUpdateData(args, address);
-        const updateData = { ClientID: clientId, ...entityData };
-        const cleanData = cleanParams(updateData);
+        const details: Record<string, unknown> = { ClientID: clientId };
+        if (args.companyName) details.CompanyName = args.companyName;
+        if (args.address1) details.AddressLine1 = args.address1;
+        if (args.address2) details.AddressLine2 = args.address2;
+        if (args.town) details.Town = args.town;
+        if (args.postcode) details.Postcode = args.postcode;
+        if (args.country) details.CountryISO = args.country;
+        if (args.vatNumber) details.VatNumber = args.vatNumber;
+
         await apiClient.request<
-          { ClientData: typeof cleanData },
+          { ClientDetails: typeof details },
           Record<string, never>
-        >("Client_Update", { ClientData: cleanData });
+        >("Client_Update", { ClientDetails: details });
         return successResult({
           success: true,
           clientId,
