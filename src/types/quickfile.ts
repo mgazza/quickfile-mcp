@@ -143,13 +143,13 @@ export interface Invoice {
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'VIEWED' | 'PAID' | 'PART_PAID' | 'OVERDUE' | 'CANCELLED';
 
 export interface InvoiceLine {
-  ItemID?: number;
-  ItemName?: string;
   ItemDescription: string;
+  ItemNominalCode?: string;
+  Tax1?: InvoiceLineTax;
   UnitCost: number;
   Qty: number;
-  NominalCode?: string;
-  Tax1?: InvoiceLineTax;
+  ItemID?: number;
+  ItemName?: string;
   Tax2?: InvoiceLineTax;
   LineTotal?: number;
 }
@@ -211,12 +211,19 @@ export interface Purchase {
 export type PurchaseStatus = 'UNPAID' | 'PAID' | 'PART_PAID' | 'CANCELLED';
 
 export interface PurchaseLine {
+  ItemNominalCode: string;
   ItemDescription: string;
-  UnitCost: number;
-  Qty: number;
-  NominalCode: string;
-  Tax1?: InvoiceLineTax;
-  LineTotal?: number;
+  SubTotal: number;
+  VatRate: number;
+  VatTotal: number;
+}
+
+export interface PurchasePaymentData {
+  PaidDate: string;
+  BankNominalCode: number;
+  PayMethod: 'BACS' | 'DD' | 'STO' | 'CHEQUE' | 'CASH' | 'DCARD' | 'CCARD';
+  AmountPaid: number;
+  Notes?: string;
 }
 
 export interface PurchaseSearchParams {
@@ -227,18 +234,19 @@ export interface PurchaseSearchParams {
   SearchKeyword?: string;
   ReturnCount?: number;
   Offset?: number;
-  OrderResultsBy?: 'PurchaseDate' | 'DueDate' | 'SupplierName' | 'GrossAmount';
+  OrderResultsBy?: 'ReceiptNumber' | 'ReceiptDate' | 'SupplierName' | 'Total';
   OrderDirection?: 'ASC' | 'DESC';
 }
 
 export interface PurchaseCreateParams {
   SupplierID: number;
+  ReceiptDate: string;
+  TermDays?: number;
   Currency?: string;
-  IssueDate?: string;
-  DueDate?: string;
-  PurchaseLines: PurchaseLine[];
-  Notes?: string;
-  SupplierRef?: string;
+  InvoiceDescription: string;
+  SupplierReference?: string;
+  InvoiceLines: { ItemLine: PurchaseLine[] };
+  PaymentData?: PurchasePaymentData;
 }
 
 // =============================================================================
@@ -330,32 +338,6 @@ export interface BankTransactionCreateParams {
 // =============================================================================
 // Report Types
 // =============================================================================
-
-export interface ProfitAndLossReport {
-  StartDate: string;
-  EndDate: string;
-  Income: ReportSection[];
-  Expenses: ReportSection[];
-  TotalIncome: number;
-  TotalExpenses: number;
-  NetProfit: number;
-}
-
-export interface ReportSection {
-  NominalCode: string;
-  NominalName: string;
-  Amount: number;
-}
-
-export interface BalanceSheetReport {
-  ReportDate: string;
-  Assets: ReportSection[];
-  Liabilities: ReportSection[];
-  Equity: ReportSection[];
-  TotalAssets: number;
-  TotalLiabilities: number;
-  TotalEquity: number;
-}
 
 export interface VatObligation {
   PeriodKey: string;

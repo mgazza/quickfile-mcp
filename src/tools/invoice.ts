@@ -8,8 +8,6 @@ import { getApiClient } from "../api/client.js";
 import type {
   Invoice,
   InvoiceSearchParams,
-  InvoiceCreateParams,
-  InvoiceLine,
   InvoiceType,
   InvoiceStatus,
 } from "../types/quickfile.js";
@@ -18,10 +16,7 @@ import {
   successResult,
   errorResult,
   cleanParams,
-  mapLineItems,
   dateRangeSearchProperties,
-  lineItemSchemaProperties,
-  type LineItemInput,
   type ToolResult,
 } from "./utils.js";
 
@@ -119,6 +114,15 @@ export const invoiceTools: Tool[] = [
           description: "Payment terms in days",
           default: 30,
         },
+        language: {
+          type: 'string',
+          description: 'Invoice language (default: en)',
+          default: 'en',
+        },
+        invoiceDescription: {
+          type: 'string',
+          description: 'Invoice description',
+        },
         issueDate: {
           type: "string",
           description: "Issue date (YYYY-MM-DD, default: today)",
@@ -137,10 +141,26 @@ export const invoiceTools: Tool[] = [
           items: {
             type: "object",
             properties: {
-              ...lineItemSchemaProperties,
+              description: {
+                type: "string",
+                description: "Item description",
+              },
               nominalCode: {
                 type: "string",
-                description: "Nominal code for accounting",
+                description: "Nominal code (e.g., 4000 for sales)",
+              },
+              unitCost: {
+                type: "number",
+                description: "Unit price",
+              },
+              quantity: {
+                type: "number",
+                description: "Quantity",
+              },
+              vatPercentage: {
+                type: "number",
+                description: "VAT percentage (default: 20)",
+                default: 20,
               },
             },
             required: ["description", "unitCost", "quantity"],
@@ -325,28 +345,66 @@ export async function handleInvoiceTool(
       }
 
       case "quickfile_invoice_create": {
-        const lineItems = args.lines as LineItemInput[];
-        const invoiceLines = mapLineItems<InvoiceLine>(lineItems, {
-          includeItemId: true,
+        const lineItems = args.lines as Array<{
+          description: string;
+          unitCost: number;
+          quantity: number;
+          vatPercentage?: number;
+          nominalCode?: string;
+        }>;
+
+        // Build ItemLine array with correct field ordering:
+        // ItemDescription, ItemNominalCode, Tax1, UnitCost, Qty, ItemID
+        const itemLines = lineItems.map((line) => {
+          const vatPct = line.vatPercentage ?? 20;
+          const taxAmount = Math.round(line.unitCost * line.quantity * vatPct / 100 * 100) / 100;
+          const item: Record<string, unknown> = {
+            ItemDescription: line.description,
+          };
+          if (line.nominalCode) item.ItemNominalCode = line.nominalCode;
+          item.Tax1 = { TaxName: "VAT", TaxPercentage: vatPct, TaxAmount: taxAmount };
+          item.UnitCost = line.unitCost;
+          item.Qty = line.quantity;
+          item.ItemID = 0;
+          return item;
         });
 
-        const createParams: InvoiceCreateParams = {
-          InvoiceType: args.invoiceType as InvoiceType,
+        // Build InvoiceData with correct element ordering
+        const invoiceData: Record<string, unknown> = {
+          InvoiceType: args.invoiceType as string,
           ClientID: args.clientId as number,
           Currency: (args.currency as string) ?? "GBP",
           TermDays: (args.termDays as number) ?? 30,
-          IssueDate: args.issueDate as string | undefined,
-          PONumber: args.poNumber as string | undefined,
-          Notes: args.notes as string | undefined,
-          InvoiceLines: invoiceLines,
+          Language: (args.language as string) ?? 'en',
         };
 
-        const cleaned = cleanParams(createParams);
+        if (args.invoiceDescription) {
+          invoiceData.InvoiceDescription = args.invoiceDescription;
+        }
+
+        // Correct nesting: InvoiceLines -> ItemLines -> ItemLine[]
+        invoiceData.InvoiceLines = {
+          ItemLines: {
+            ItemLine: itemLines,
+          },
+        };
+
+        // IssueDate must be nested in Scheduling.SingleInvoiceData
+        if (args.issueDate) {
+          invoiceData.Scheduling = {
+            SingleInvoiceData: {
+              IssueDate: args.issueDate,
+            },
+          };
+        }
+
+        if (args.notes) invoiceData.Notes = args.notes;
+        if (args.poNumber) invoiceData.PONumber = args.poNumber;
 
         const response = await apiClient.request<
-          { InvoiceData: typeof cleaned },
+          { InvoiceData: typeof invoiceData },
           InvoiceCreateResponse
-        >("Invoice_Create", { InvoiceData: cleaned });
+        >("Invoice_Create", { InvoiceData: invoiceData });
 
         return successResult({
           success: true,

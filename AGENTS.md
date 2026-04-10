@@ -117,13 +117,52 @@ Searches for clients by various criteria.
 Creates a new client record.
 
 **Key Parameters**:
-- `companyName`: Company or individual name
+- `companyName`: Company or individual name (required)
+- `address1`, `address2`: Address lines
+- `town`, `postcode`: Town/City and postcode
+- `country`: ISO country code (e.g. GB)
+- `vatNumber`: VAT registration number
+
+### Supplier Tools
+
+#### `quickfile_supplier_create`
+Creates a new supplier record.
+
+**Key Parameters**:
+- `companyName`: Company or organisation name
 - `firstName`, `lastName`: Contact name
-- `email`, `telephone`, `mobile`: Contact details
-- `address1`, `town`, `postcode`, `country`: Address
-- `vatNumber`: VAT registration
-- `currency`: Default currency (GBP)
-- `termDays`: Payment terms (default: 30)
+- `email`: Email address
+- `telephone`: Telephone number
+- `website`: Website URL
+- `address1`, `address2`: Address lines
+- `town`, `postcode`: Town/City and postcode
+- `country`: ISO country code (e.g. GB)
+- `vatNumber`: VAT registration number
+- `companyRegNo`: Company registration number
+
+### Purchase Tools
+
+#### `quickfile_purchase_create`
+Creates a new purchase invoice.
+
+**Key Parameters**:
+- `supplierId`: Supplier ID (required)
+- `receiptDate`: Receipt/invoice date YYYY-MM-DD (required)
+- `invoiceDescription`: Invoice description 2-35 chars (required)
+- `lines`: Array of line items (required), each with:
+  - `nominalCode`: Nominal code (e.g. 5000)
+  - `description`: Item description
+  - `subTotal`: Net amount ex-VAT
+  - `vatRate`: VAT rate percentage (e.g. 20)
+  - `vatTotal`: VAT amount
+- `termDays`: Payment terms in days (default: 0)
+- `currency`: Currency code (default: GBP)
+- `supplierRef`: Supplier invoice reference number
+- `payment`: Optional payment object to auto-tag bank transaction:
+  - `paidDate`: Payment date YYYY-MM-DD
+  - `bankNominalCode`: Bank nominal code (e.g. 1200)
+  - `payMethod`: BACS, DD, STO, CHEQUE, CASH, DCARD, or CCARD
+  - `amountPaid`: Gross amount paid (inc VAT)
 
 ### Invoice Tools
 
@@ -133,6 +172,8 @@ Creates invoices, estimates, or credit notes.
 **Parameters**:
 - `invoiceType`: INVOICE, ESTIMATE, or CREDIT
 - `clientId`: Client ID
+- `invoiceDescription`: Invoice description
+- `language`: Invoice language (default: en)
 - `lines`: Array of line items with description, unitCost, quantity, vatPercentage
 
 **Example**:

@@ -82,7 +82,7 @@ export const bankTools: Tool[] = [
         },
         tagged: {
           type: "boolean",
-          description: "Filter by tagged status",
+          description: "Filter by tagged status (true=tagged, false=untagged). Note: this filter may not be fully reliable for all transaction types in the QuickFile API",
         },
         returnCount: {
           type: "number",
@@ -258,6 +258,9 @@ function buildBankSearchParams(
     if (args[argKey] !== undefined) {
       searchParams[apiKey] = args[argKey];
     }
+  }
+  if (args.tagged !== undefined) {
+    searchParams.Tagged = args.tagged ? "Yes" : "No";
   }
 
   return searchParams;

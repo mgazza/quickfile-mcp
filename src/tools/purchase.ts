@@ -7,18 +7,12 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { getApiClient } from "../api/client.js";
 import type {
   Purchase,
-  PurchaseCreateParams,
   PurchaseLine,
 } from "../types/quickfile.js";
 import {
   handleToolError,
   successResult,
   errorResult,
-  cleanParams,
-  mapLineItems,
-  dateRangeSearchProperties,
-  lineItemSchemaProperties,
-  type LineItemInput,
   type ToolResult,
 } from "./utils.js";
 
@@ -38,7 +32,14 @@ export const purchaseTools: Tool[] = [
           type: "number",
           description: "Filter by supplier ID",
         },
-        ...dateRangeSearchProperties,
+        dateFrom: {
+          type: "string",
+          description: "Start date (YYYY-MM-DD)",
+        },
+        dateTo: {
+          type: "string",
+          description: "End date (YYYY-MM-DD)",
+        },
         status: {
           type: "string",
           enum: ["UNPAID", "PAID", "PART_PAID", "CANCELLED"],
@@ -48,10 +49,25 @@ export const purchaseTools: Tool[] = [
           type: "string",
           description: "Search keyword",
         },
+        returnCount: {
+          type: "number",
+          description: "Number of results (default: 25)",
+          default: 25,
+        },
+        offset: {
+          type: "number",
+          description: "Offset for pagination",
+          default: 0,
+        },
         orderBy: {
           type: "string",
           enum: ["ReceiptNumber", "ReceiptDate", "SupplierName", "Total"],
           description: "Field to order by",
+        },
+        orderDirection: {
+          type: "string",
+          enum: ["ASC", "DESC"],
+          description: "Order direction",
         },
       },
       required: [],
@@ -78,49 +94,41 @@ export const purchaseTools: Tool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        supplierId: {
-          type: "number",
-          description: "Supplier ID",
-        },
-        currency: {
-          type: "string",
-          description: "Currency code (default: GBP)",
-          default: "GBP",
-        },
-        issueDate: {
-          type: "string",
-          description: "Invoice date (YYYY-MM-DD)",
-        },
-        dueDate: {
-          type: "string",
-          description: "Due date (YYYY-MM-DD)",
-        },
-        supplierRef: {
-          type: "string",
-          description: "Supplier invoice reference number",
-        },
-        notes: {
-          type: "string",
-          description: "Notes",
-        },
+        supplierId: { type: "number", description: "Supplier ID" },
+        receiptDate: { type: "string", description: "Receipt/invoice date (YYYY-MM-DD)" },
+        termDays: { type: "number", description: "Payment terms in days (default: 0)", default: 0 },
+        currency: { type: "string", description: "Currency code (default: GBP)", default: "GBP" },
+        invoiceDescription: { type: "string", description: "Invoice description (2-35 chars, required)" },
+        supplierRef: { type: "string", description: "Supplier invoice reference number" },
         lines: {
           type: "array",
           description: "Purchase line items",
           items: {
             type: "object",
             properties: {
-              ...lineItemSchemaProperties,
-              nominalCode: {
-                type: "string",
-                description:
-                  "Nominal code for accounting (e.g., 5000 for cost of sales)",
-              },
+              nominalCode: { type: "string", description: "Nominal code (e.g., 5000)" },
+              description: { type: "string", description: "Item description" },
+              subTotal: { type: "number", description: "Net total for this line (ex-VAT)" },
+              vatRate: { type: "number", description: "VAT rate percentage (e.g., 20)", default: 20 },
+              vatTotal: { type: "number", description: "VAT amount for this line" },
             },
-            required: ["description", "unitCost", "quantity", "nominalCode"],
+            required: ["nominalCode", "description", "subTotal", "vatRate", "vatTotal"],
           },
         },
+        payment: {
+          type: "object",
+          description: "Optional payment data to auto-tag bank transaction",
+          properties: {
+            paidDate: { type: "string", description: "Payment date (YYYY-MM-DD)" },
+            bankNominalCode: { type: "number", description: "Bank nominal code (e.g., 1200)" },
+            payMethod: { type: "string", enum: ["BACS", "DD", "STO", "CHEQUE", "CASH", "DCARD", "CCARD"], description: "Payment method" },
+            amountPaid: { type: "number", description: "Amount paid (gross, inc VAT)" },
+            notes: { type: "string", description: "Payment notes" },
+          },
+          required: ["paidDate", "bankNominalCode", "payMethod", "amountPaid"],
+        },
       },
-      required: ["supplierId", "lines"],
+      required: ["supplierId", "receiptDate", "invoiceDescription", "lines"],
     },
   },
   {
@@ -228,25 +236,60 @@ export async function handlePurchaseTool(
       }
 
       case "quickfile_purchase_create": {
-        const lineItems = args.lines as LineItemInput[];
-        const purchaseLines = mapLineItems<PurchaseLine>(lineItems);
+        const lineItems = args.lines as Array<{
+          nominalCode: string;
+          description: string;
+          subTotal: number;
+          vatRate: number;
+          vatTotal: number;
+        }>;
 
-        const createParams: PurchaseCreateParams = {
+        const itemLines: PurchaseLine[] = lineItems.map((line) => ({
+          ItemNominalCode: line.nominalCode,
+          ItemDescription: line.description,
+          SubTotal: line.subTotal,
+          VatRate: line.vatRate,
+          VatTotal: line.vatTotal,
+        }));
+
+        // Build PurchaseData with correct element ordering
+        const purchaseData: Record<string, unknown> = {
           SupplierID: args.supplierId as number,
+          ReceiptDate: args.receiptDate as string,
+          TermDays: (args.termDays as number) ?? 0,
           Currency: (args.currency as string) ?? "GBP",
-          IssueDate: args.issueDate as string | undefined,
-          DueDate: args.dueDate as string | undefined,
-          SupplierRef: args.supplierRef as string | undefined,
-          Notes: args.notes as string | undefined,
-          PurchaseLines: purchaseLines,
+          InvoiceDescription: args.invoiceDescription as string,
         };
 
-        const cleaned = cleanParams(createParams);
+        if (args.supplierRef) {
+          purchaseData.SupplierReference = args.supplierRef;
+        }
+
+        purchaseData.InvoiceLines = { ItemLine: itemLines };
+
+        const payment = args.payment as {
+          paidDate: string;
+          bankNominalCode: number;
+          payMethod: string;
+          amountPaid: number;
+          notes?: string;
+        } | undefined;
+
+        if (payment) {
+          const paymentData: Record<string, unknown> = {
+            PaidDate: payment.paidDate,
+            BankNominalCode: payment.bankNominalCode,
+            PayMethod: payment.payMethod,
+            AmountPaid: payment.amountPaid,
+          };
+          if (payment.notes) paymentData.Notes = payment.notes;
+          purchaseData.PaymentData = paymentData;
+        }
 
         const response = await apiClient.request<
-          { PurchaseData: typeof cleaned },
+          { PurchaseData: typeof purchaseData },
           PurchaseCreateResponse
-        >("Purchase_Create", { PurchaseData: cleaned });
+        >("Purchase_Create", { PurchaseData: purchaseData });
 
         return successResult({
           success: true,
