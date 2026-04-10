@@ -143,13 +143,13 @@ export interface Invoice {
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'VIEWED' | 'PAID' | 'PART_PAID' | 'OVERDUE' | 'CANCELLED';
 
 export interface InvoiceLine {
-  ItemID?: number;
-  ItemName?: string;
   ItemDescription: string;
+  ItemNominalCode?: string;
+  Tax1?: InvoiceLineTax;
   UnitCost: number;
   Qty: number;
-  NominalCode?: string;
-  Tax1?: InvoiceLineTax;
+  ItemID?: number;
+  ItemName?: string;
   Tax2?: InvoiceLineTax;
   LineTotal?: number;
 }
