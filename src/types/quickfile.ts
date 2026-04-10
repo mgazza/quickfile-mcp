@@ -234,7 +234,7 @@ export interface PurchaseSearchParams {
   SearchKeyword?: string;
   ReturnCount?: number;
   Offset?: number;
-  OrderResultsBy?: 'PurchaseDate' | 'DueDate' | 'SupplierName' | 'GrossAmount';
+  OrderResultsBy?: 'ReceiptNumber' | 'ReceiptDate' | 'SupplierName' | 'Total';
   OrderDirection?: 'ASC' | 'DESC';
 }
 
