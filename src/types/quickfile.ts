@@ -339,32 +339,6 @@ export interface BankTransactionCreateParams {
 // Report Types
 // =============================================================================
 
-export interface ProfitAndLossReport {
-  StartDate: string;
-  EndDate: string;
-  Income: ReportSection[];
-  Expenses: ReportSection[];
-  TotalIncome: number;
-  TotalExpenses: number;
-  NetProfit: number;
-}
-
-export interface ReportSection {
-  NominalCode: string;
-  NominalName: string;
-  Amount: number;
-}
-
-export interface BalanceSheetReport {
-  ReportDate: string;
-  Assets: ReportSection[];
-  Liabilities: ReportSection[];
-  Equity: ReportSection[];
-  TotalAssets: number;
-  TotalLiabilities: number;
-  TotalEquity: number;
-}
-
 export interface VatObligation {
   PeriodKey: string;
   StartDate: string;
